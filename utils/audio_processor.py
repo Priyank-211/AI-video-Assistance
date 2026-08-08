@@ -1,9 +1,29 @@
 import yt_dlp
 from pydub import AudioSegment
 import os
+import shutil
+
+# ── Locate ffmpeg so yt-dlp and pydub can find it ──────────────────────────────
+FFMPEG_DIR = None
+_winget_path = os.path.expanduser(
+    r"~\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0-full_build\bin"
+)
+if os.path.isfile(os.path.join(_winget_path, "ffmpeg.exe")):
+    FFMPEG_DIR = _winget_path
+elif shutil.which("ffmpeg"):
+    FFMPEG_DIR = os.path.dirname(shutil.which("ffmpeg"))
+
+if FFMPEG_DIR and FFMPEG_DIR not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = FFMPEG_DIR + os.pathsep + os.environ.get("PATH", "")
+
+# Tell pydub where to find ffmpeg / ffprobe
+if FFMPEG_DIR:
+    ext = ".exe" if os.name == "nt" else ""
+    AudioSegment.converter = os.path.join(FFMPEG_DIR, f"ffmpeg{ext}")
+    AudioSegment.ffprobe = os.path.join(FFMPEG_DIR, f"ffprobe{ext}")
 
 DOWNLOAD_DIR = 'downloades'
-os.makedirs(DOWNLOAD_DIR,exist_ok = True)
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 def download_youtube_audio(url :str) ->str:
     output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
@@ -19,6 +39,8 @@ def download_youtube_audio(url :str) ->str:
         ],
         "quiet": True,
     }
+    if FFMPEG_DIR:
+        ydl_opts["ffmpeg_location"] = FFMPEG_DIR
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info).replace(".webm", ".wav").replace(".m4a", ".wav")
